@@ -1,0 +1,24 @@
+{
+  "author": "Eldar Gabdullin <eldargab@gmail.com>",
+  "name": "go-async",
+  "description": "Async code blocks with support for abortion and fast synchronous execution",
+  "keywords": [
+    "async",
+    "await",
+    "generator"
+  ],
+  "version": "0.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://eldargab@github.com/eldargab/go-async.git"
+  },
+  "main": "./go",
+  "devDependencies": {
+    "mocha": "^2.2.5",
+    "should": "^6.0.3"
+  },
+  "license": "MIT",
+  "scripts": {
+    "test": "mocha --harmony"
+  }
+}
