@@ -3,26 +3,28 @@ var go = require('../go')
 
 describe('go-async', function() {
   describe('go block', function() {
-    it('Should support promises', function(done) {
+    it('Should return future', function() {
       go(function*() {
+        yield 1
+      }).should.be.instanceOf(go.Future)
+    })
+
+    it('Should support promises', function() {
+      return go(function*() {
         var a = yield Promise.resolve(1)
         var b = yield Promise.resolve(2)
         return a + b
-      }).next(function(err, ab) {
-        if (err) return done(err)
+      }).then(function(ab) {
         ab.should.equal(3)
-        done()
       })
     })
 
     it('Should support futures', function() {
-      go(function*() {
+      return go(function*() {
         var a = yield go(function*() { return Promise.resolve(10)})
-        return a++
-      }).next(function(err, a) {
-        if (err) return done(err)
+        return a + 1
+      }).then(function(a) {
         a.should.equal(11)
-        done()
       })
     })
 
