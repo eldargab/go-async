@@ -4,6 +4,8 @@ function go(block) {
   return run(block())
 }
 
+go.run = run
+
 function run(gen) {
   var itm
     , error
@@ -160,21 +162,12 @@ go.fn = function(block) {
   }
 }
 
-go.thunk = function(thunk, close) {
+go.thunk = function(thunk) {
   var ret = new Future
 
   thunk(function(err, val) {
     ret.done(err, val)
   })
-
-  if (close && !ret.ready) ret.done = function(err, val) {
-    if (this.aborted && !err && !this.closed) {
-      this.closed = true
-      close(val)
-      return
-    }
-    Future.prototype.done.call(this, err, val)
-  }
 
   return ret
 }
