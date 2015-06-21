@@ -12,16 +12,24 @@ function run(gen) {
     , value
     , ret = new Future
     , aborted = false
+    , running = false
 
   loop(function(next) {
     if (aborted) return
     if (itm && itm.done) return ret.done(error, value)
+
+    running = true
 
     try {
       itm = error ? gen.throw(error) : gen.next(value)
     } catch(e) {
       return ret.done(toError(e))
     }
+
+    running = false
+
+    // We've got abort while been in generator, do it now
+    if (aborted && !itm.done) return ret.onabort()
 
     error = undefined
     value = undefined
@@ -50,14 +58,23 @@ function run(gen) {
     next()
   })
 
-  if (!ret.ready) ret.onabort = function() {
+  if (!ret.ready) ret.onabort = function () {
     aborted = true
+
+    // Since our strategy is to yield results immediately
+    // without going through event loop, in some
+    // rare but still valid cases we can receive abortion
+    // while generator is still running.
+    // In such cases we must defer abortion until
+    // generator step completes.
+    if (running) return
+
     try {
       gen.throw(go.abortException)
     } catch(e) {
-      if (e !== go.abortException) throw e
+      if (e !== go.abortException) console.log(e)
     } finally {
-      itm.value.abort && itm.value.abort()
+      itm.value && itm.value.abort && itm.value.abort()
     }
   }
 

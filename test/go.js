@@ -62,5 +62,19 @@ describe('go-async', function() {
       finals.should.equal(2)
       f.aborted.should.be.true
     })
+
+    it('Should support abortion within generator', function() {
+      var task = new go.Future
+      var lock = new go.Future
+      var f = go(function*() {
+        yield lock
+        should(function() {
+          f.abort()
+        }).not.throw()
+        yield task
+      })
+      lock.done()
+      task.aborted.should.be.true
+    })
   })
 })
