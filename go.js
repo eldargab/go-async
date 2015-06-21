@@ -43,7 +43,7 @@ function run(gen) {
       return
     }
 
-    if (isPromise(itm.value)) {
+    if (isPromise(itm.value)) { // this check slows down the whole thing ~ 10%
       itm.value.then(function(v) {
         value = v
         next()
