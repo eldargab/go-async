@@ -35,7 +35,7 @@ function run(gen) {
     value = undefined
 
     if (itm.value instanceof Future) {
-      itm.value.next(function(err, val) {
+      itm.value.get(function(err, val) {
         error = err
         value = val
         next()
@@ -108,7 +108,7 @@ Future.prototype.done = function(err, val) {
   cb && cb(err, val)
 }
 
-Future.prototype.next = function(cb) {
+Future.prototype.get = function(cb) {
   if (this.ready) return cb(this.error, this.value)
   this.cb = cb
 }

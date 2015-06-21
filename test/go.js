@@ -9,22 +9,26 @@ describe('go-async', function() {
       }).should.be.instanceOf(go.Future)
     })
 
-    it('Should support promises', function() {
-      return go(function*() {
+    it('Should support promises', function(done) {
+      go(function*() {
         var a = yield Promise.resolve(1)
         var b = yield Promise.resolve(2)
         return a + b
-      }).then(function(ab) {
+      }).get(function(err, ab) {
+        if (err) return done(err)
         ab.should.equal(3)
+        done()
       })
     })
 
-    it('Should support futures', function() {
-      return go(function*() {
-        var a = yield go(function*() { return Promise.resolve(10)})
+    it('Should support futures', function(done) {
+      go(function*() {
+        var a = yield go(function*() { return Promise.resolve(10) })
         return a + 1
-      }).then(function(a) {
+      }).get(function(err, a) {
+        if (err) return done(err)
         a.should.equal(11)
+        done()
       })
     })
 
