@@ -93,18 +93,7 @@ Future.prototype.done = function(err, val) {
   this.ready = true
   this.error = err
   this.value = val
-  if (this.promise) {
-    if (err) {
-      this.reject(err)
-    } else {
-      this.resolve(val)
-    }
-    this.reject = null
-    this.resolve = null
-    this.promise = null
-  }
-  var cb = this.cb
-  this.cb = null
+  var cb = this.cb; this.cb = null
   cb && cb(err, val)
 }
 
@@ -117,35 +106,7 @@ Future.prototype.abort = function() {
   if (this.aborted || this.ready) return
   this.aborted = true
   this.cb = null
-  this.promise = null
-  this.reject = null
-  this.resolve = null
   this.onabort && this.onabort()
-}
-
-Future.prototype.getPromise = function() {
-  if (this.aborted) return new Promise(function() {})
-
-  if (this.ready) return this.error
-    ? Promise.reject(this.error)
-    : Promise.resolve(this.value)
-
-  if (this.promise) return this.promise
-
-  var self = this
-
-  return this.promise = new Promise(function(resolve, reject) {
-    self.resolve = resolve
-    self.reject = reject
-  })
-}
-
-Future.prototype.then = function(onsucc, onerr) {
-  return this.getPromise().then(onsucc, onerr)
-}
-
-Future.prototype.catch = function(cb) {
-  return this.getPromise().catch(cb)
 }
 
 function toError(e) {
