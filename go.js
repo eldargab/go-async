@@ -72,7 +72,9 @@ function run(gen) {
     try {
       gen.throw(go.abortException)
     } catch(e) {
-      if (e !== go.abortException) throw e
+      if (e !== go.abortException) process.nextTick(function() {
+        throw e
+      })
     } finally {
       itm.value && itm.value.abort && itm.value.abort()
     }
