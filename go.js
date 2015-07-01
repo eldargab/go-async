@@ -94,7 +94,14 @@ Future.prototype.done = function(err, val) {
   this.error = err
   this.value = val
   var cb = this.cb; this.cb = null
-  cb && cb(err, val)
+  if (!cb) return
+  try {
+    cb(err, val)
+  } catch (e) {
+    process.nextTick(function() {
+      throw e
+    })
+  }
 }
 
 Future.prototype.get = function(cb) {
