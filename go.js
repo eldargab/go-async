@@ -94,14 +94,7 @@ Future.prototype.done = function(err, val) {
   this.error = err
   this.value = val
   var cb = this.cb; this.cb = null
-  if (!cb) return
-  try {
-    cb(err, val)
-  } catch (e) {
-    process.nextTick(function() {
-      throw e
-    })
-  }
+  cb && safecall(cb, err, val)
 }
 
 Future.prototype.get = function(cb) {
@@ -113,7 +106,17 @@ Future.prototype.abort = function() {
   if (this.aborted || this.ready) return
   this.aborted = true
   this.cb = null
-  this.onabort && this.onabort()
+  this.onabort && safecall(this.onabort)
+}
+
+function safecall(cb, err, val) {
+  try {
+    cb(err, val)
+  } catch(e) {
+    process.nextTick(function() {
+      throw e
+    })
+  }
 }
 
 function toError(e) {
