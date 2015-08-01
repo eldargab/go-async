@@ -34,6 +34,10 @@ function run(gen) {
     error = undefined
     value = undefined
 
+    if (isGenerator(itm.value)) {
+      itm.value = run(itm.value)
+    }
+
     if (itm.value instanceof Future) {
       itm.value.get(function(err, val) {
         error = err
@@ -142,6 +146,10 @@ function loop(fn) {
 
 function isPromise(obj) {
   return obj && typeof obj.then == 'function'
+}
+
+function isGenerator(obj) {
+  return obj && typeof obj.throw == 'function'
 }
 
 go.abortException = new Error('Abort exception')

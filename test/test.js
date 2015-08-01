@@ -9,6 +9,16 @@ describe('go-async', function() {
       }).should.be.instanceOf(go.Future)
     })
 
+    it('Should support generators', function(done) {
+      go(function*() {
+        return (function*() { return 'a' })()
+      }).get(function(err, a) {
+        if (err) return done(err)
+        a.should.equal('a')
+        done()
+      })
+    })
+
     it('Should support promises', function(done) {
       go(function*() {
         var a = yield Promise.resolve(1)
