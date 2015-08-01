@@ -1,7 +1,7 @@
 module.exports = go
 
 function go(block) {
-  return run(block())
+  return run(block.apply(null, [].slice.call(arguments, 1)))
 }
 
 go.run = run
