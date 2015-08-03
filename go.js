@@ -107,19 +107,24 @@ Future.prototype.done = function(err, val) {
   this.ready = true
   this.error = err
   this.value = val
-  var cb = this.cb; this.cb = null
-  cb && safecall(cb, err, val)
+  var cbs = this.cbs
+  if (!cbs) return
+  this.cbs = null
+  for(var i = 0; i < cbs.length; i++) {
+    safecall(cbs[i], err, val)
+  }
 }
 
 Future.prototype.get = function(cb) {
   if (this.ready) return cb(this.error, this.value)
-  this.cb = cb
+  if (this.cbs) return this.cbs.push(cb)
+  this.cbs = [cb]
 }
 
 Future.prototype.abort = function() {
   if (this.aborted || this.ready) return
   this.aborted = true
-  this.cb = null
+  this.cbs = null
   this.onabort && safecall(this.onabort)
 }
 
