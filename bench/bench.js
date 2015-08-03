@@ -15,6 +15,10 @@ var suite = new Bench.Suite
 var array_10 = makeArray(10)
 var array_100 = makeArray(100)
 
+function* one() {
+  return 1
+}
+
 function* sum(arr) {
   var sum = 0
   for(var i = 0; i < arr.length; i++) {
@@ -24,10 +28,10 @@ function* sum(arr) {
 }
 
 function* nested() {
-  var i = 10
+  var i = 100
   var ret = 0
   while(i--) {
-    ret += yield sum(array_10)
+    ret += yield one()
   }
   return ret
 }
@@ -39,8 +43,8 @@ function* iterate(arr) {
 }
 
 suite.add('Plain return', function() {
-  var future = go(function*() { return 10 })
-  assert.equal(future.value, 10)
+  var future = go(one)
+  assert.equal(future.value, 1)
 })
 
 suite.add('Sync iterating 10 element array', function() {
@@ -53,7 +57,7 @@ suite.add('Sync iterating 100 element array', function() {
   assert.equal(future.value, 100)
 })
 
-suite.add('Nested 10 x 10', function() {
+suite.add('Nested 100', function() {
   var future = go(nested)
   assert.equal(future.value, 100)
 })
