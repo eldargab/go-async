@@ -8,13 +8,11 @@ go.run = run
 
 function run(gen) {
   var itm
-    , error
-    , value
     , ret = new Future
     , aborted = false
     , running = false
 
-  loop(function(next) {
+  loop(function(error, value, next) {
     if (aborted) return
     if (itm && itm.done) return ret.done(error, value)
 
@@ -31,35 +29,25 @@ function run(gen) {
     // We've got abort while been in generator, do it now
     if (aborted && !itm.done) return ret.onabort()
 
-    error = undefined
-    value = undefined
-
     if (isGenerator(itm.value)) {
       itm.value = run(itm.value)
     }
 
     if (itm.value instanceof Future) {
-      itm.value.get(function(err, val) {
-        error = err
-        value = val
-        next()
-      })
+      itm.value.get(next)
       return
     }
 
     if (isPromise(itm.value)) { // this check slows down the whole thing ~ 10%
       itm.value.then(function(v) {
-        value = v
-        next()
+        next(null, v)
       }, function(e) {
-        error = toError(e)
-        next()
+        next(toError(e))
       })
       return
     }
 
-    value = itm.value
-    next()
+    next(null, itm.value)
   })
 
   if (!ret.ready) ret.onabort = function () {
@@ -132,13 +120,15 @@ function toError(e) {
   return err
 }
 
-function loop(fn) {
+function loop(fn, err, val) {
   var sync = true
   while(sync) {
     var done = false
-    fn(function() {
+    fn(err, val, function(e, v) {
       done = true
-      if (!sync) loop(fn)
+      if (!sync) return loop(fn, e, v)
+      err = e
+      val = v
     })
     sync = done
   }
