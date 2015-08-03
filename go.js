@@ -1,41 +1,55 @@
 module.exports = go
 
 function go(block) {
-  return run(block.apply(null, [].slice.call(arguments, 1)))
+  var args = [].slice.call(arguments, 1)
+  var gen = block.apply(null, args)
+  return run(gen)
 }
 
 go.run = run
 
 function run(gen) {
-  var itm
-    , ret = new Future
+  var ret = new Future
+    , stack = [gen]
     , aborted = false
     , running = false
+    , waits
 
-  loop(function(error, value, next) {
-    if (aborted) return
-    if (itm && itm.done) return ret.done(error, value)
+  function pop() {
+    stack.pop()
+    gen = stack.length ? stack[stack.length - 1] : null
+  }
 
+  loop(function(err, val, next) {
+    if (aborted) return ret.onabort() // We've got abort while been in generator, do it now
+    if (!gen) return ret.done(err, val)
+
+    waits = null
     running = true
 
     try {
-      itm = error ? gen.throw(error) : gen.next(value)
+      var itm = err ? gen.throw(err) : gen.next(val)
     } catch(e) {
-      return ret.done(toError(e))
+      running = false
+      pop()
+      return next(toError(e))
     }
 
     running = false
 
-    // We've got abort while been in generator, do it now
-    if (aborted && !itm.done) return ret.onabort()
-
-    if (isGenerator(itm.value)) {
-      itm.value = run(itm.value)
-    }
+    if (itm.done) pop()
 
     if (itm.value instanceof Future) {
-      itm.value.get(next)
-      return
+      waits = itm.value
+      if (!aborted) return waits.get(next)
+    }
+
+    if (aborted) return next()
+
+    if (isGenerator(itm.value)) {
+      gen = itm.value
+      stack.push(gen)
+      return next()
     }
 
     if (isPromise(itm.value)) { // this check slows down the whole thing ~ 10%
@@ -51,26 +65,32 @@ function run(gen) {
   })
 
   if (!ret.ready) ret.onabort = function () {
-    aborted = true
+      aborted = true
 
-    // Since our strategy is to yield results immediately
-    // without going through event loop, in some
-    // rare but still valid cases we can receive abortion
-    // while generator is still running.
-    // In such cases we must defer abortion until
-    // generator step completes.
-    if (running) return
+      // Since our strategy is to yield results immediately
+      // without going through event loop, in some
+      // rare but still valid cases we can receive abortion
+      // while generator is still running.
+      // In such cases we must defer abortion until
+      // generator step completes.
+      if (running) return
 
-    try {
-      gen.throw(go.abortException)
-    } catch(e) {
-      if (e !== go.abortException) process.nextTick(function() {
-        throw e
-      })
-    } finally {
-      itm.value && itm.value.abort && itm.value.abort()
+      while(gen) {
+        try {
+          gen.throw(go.abortException)
+          process.nextTick(function() {
+            throw new Error('go blocks should not catch abort exceptions')
+          })
+        } catch(e) {
+          if (e !== go.abortException) process.nextTick(function() {
+            throw e
+          })
+        }
+        pop()
+      }
+
+      waits && waits.abort()
     }
-  }
 
   return ret
 }
