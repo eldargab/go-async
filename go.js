@@ -10,89 +10,106 @@ go.run = run
 
 function run(gen) {
   var ret = new Future
-    , stack = [gen]
-    , aborted = false
-    , running = false
-    , waits
-
-  function pop() {
-    stack.pop()
-    gen = stack.length ? stack[stack.length - 1] : null
+  var stack = new Stack(gen, ret)
+  stack.run()
+  if (!ret.ready) ret.onabort = function() {
+    stack.abort()
   }
+  return ret
+}
 
-  loop(function(err, val, next) {
-    if (aborted) return ret.onabort() // We've got abort while been in generator, do it now
-    if (!gen) return ret.done(err, val)
+function Stack(gen, ret) {
+  this.gen = gen
+  this.stack = [null, null, null, null]
+  this.idx = 0
+  this.running = false
+  this.aborted = false
+  this.waits = null
+  this.ret = ret
+}
 
-    waits = null
-    running = true
+Stack.prototype.push = function(gen) {
+  this.stack[this.idx] = this.gen
+  this.gen = gen
+  this.idx++
+}
+
+Stack.prototype.pop = function() {
+  if (this.idx == 0) return this.gen = null
+  this.idx--
+  this.gen = this.stack[this.idx]
+  this.stack[this.idx] = null
+}
+
+Stack.prototype.run = function(err, val) {
+  this.waits = null
+  while(true) {
+    if (this.aborted) return this.abort()
+    if (!this.gen) return this.ret.done(err, val)
 
     try {
-      var itm = err ? gen.throw(err) : gen.next(val)
+      this.running = true
+      var itm = err ? this.gen.throw(err) : this.gen.next(val)
     } catch(e) {
-      running = false
-      pop()
-      return next(toError(e))
+      this.pop()
+      err = toError(e)
+      val = undefined
+      continue
+    } finally {
+      this.running = false
     }
 
-    running = false
-
-    if (itm.done) pop()
+    if (itm.done) this.pop()
 
     if (itm.value instanceof Future) {
-      waits = itm.value
-      if (!aborted) return waits.get(next)
+      if (itm.value.ready) {
+        err = itm.value.error
+        val = itm.value.value
+        continue
+      }
+      this.waits = itm.value
+      if (!this.aborted) return this.waits.get(this.run.bind(this))
     }
 
-    if (aborted) return next()
+    if (this.aborted) return this.abort()
 
     if (isGenerator(itm.value)) {
-      gen = itm.value
-      stack.push(gen)
-      return next()
+      this.push(itm.value)
+      err = undefined
+      val = undefined
+      continue
     }
 
-    if (isPromise(itm.value)) { // this check slows down the whole thing ~ 10%
-      itm.value.then(function(v) {
-        next(null, v)
-      }, function(e) {
-        next(toError(e))
-      })
+    if (isPromise(itm.value)) {
+      itm.value.then(this.run.bind(this, null), this.run.bind(this))
       return
     }
 
-    next(null, itm.value)
-  })
+    err = undefined
+    val = itm.value
+  }
+}
 
-  if (!ret.ready) ret.onabort = function () {
-      aborted = true
+Stack.prototype.abort = function() {
+  this.aborted = true
 
-      // Since our strategy is to yield results immediately
-      // without going through event loop, in some
-      // rare but still valid cases we can receive abortion
-      // while generator is still running.
-      // In such cases we must defer abortion until
-      // generator step completes.
-      if (running) return
+  if (this.running) return
 
-      while(gen) {
-        try {
-          gen.throw(go.abortException)
-          process.nextTick(function() {
-            throw new Error('go blocks should not catch abort exceptions')
-          })
-        } catch(e) {
-          if (e !== go.abortException) process.nextTick(function() {
-            throw e
-          })
-        }
-        pop()
-      }
+  this.waits && this.waits.abort()
 
-      waits && waits.abort()
+  while(this.gen) {
+    try {
+      this.gen.throw(go.abortException)
+      process.nextTick(function() {
+        throw new Error('go blocks should not catch abort exceptions')
+      })
+    } catch(e) {
+      if (e !== go.abortException) process.nextTick(function() {
+        throw e
+      })
     }
-
-  return ret
+    this.pop()
+  }
 }
 
 go.Future = Future
@@ -143,20 +160,6 @@ function toError(e) {
   var err = new Error('Non-error object was throwed')
   err.value = e
   return err
-}
-
-function loop(fn, err, val) {
-  var sync = true
-  while(sync) {
-    var done = false
-    fn(err, val, function(e, v) {
-      done = true
-      if (!sync) return loop(fn, e, v)
-      err = e
-      val = v
-    })
-    sync = done
-  }
 }
 
 function isPromise(obj) {
