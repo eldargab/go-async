@@ -61,7 +61,7 @@ Stack.prototype.run = function(err, val) {
 
     if (itm.done) this.pop()
 
-    if (itm.value instanceof Future) {
+    if (isFuture(itm.value)) {
       if (itm.value.ready) {
         err = itm.value.error
         val = itm.value.value
@@ -99,12 +99,12 @@ Stack.prototype.abort = function() {
 
   while(this.gen) {
     try {
-      this.gen.throw(go.abortException)
+      this.gen.throw(abortException)
       process.nextTick(function() {
         throw new Error('go blocks should not catch abort exceptions')
       })
     } catch(e) {
-      if (e !== go.abortException) process.nextTick(function() {
+      if (!go.isAbortException(e)) process.nextTick(function() {
         throw e
       })
     }
@@ -145,6 +145,8 @@ Future.prototype.abort = function() {
   this.onabort && safecall(this.onabort)
 }
 
+Future.prototype.go_async_future = true
+
 function safecall(cb, err, val) {
   try {
     cb(err, val)
@@ -162,6 +164,12 @@ function toError(e) {
   return err
 }
 
+go.isFuture = isFuture
+
+function isFuture(obj) {
+  return obj && obj.go_async_future
+}
+
 function isPromise(obj) {
   return obj && typeof obj.then == 'function'
 }
@@ -170,7 +178,13 @@ function isGenerator(obj) {
   return obj && typeof obj.throw == 'function'
 }
 
-go.abortException = new Error('Abort exception')
+go.isAbortException = function(e) {
+  return e && e.go_abort_exception
+}
+
+const abortException = new Error('Abort exception')
+
+abortException.go_abort_exception = true
 
 go.fn = function(block) {
   return function() {
