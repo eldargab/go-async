@@ -1,11 +1,11 @@
-#go-async
+# go-async
 
 Non-conformant, generator based async/await blocks
 with support for abortion, form of TCO and fast synchronous execution.
 
-##Highlights
+## Highlights
 
-###Abortion
+### Abortion
 
 ```javascript
 var future = go(function*() {
@@ -28,7 +28,7 @@ setTimeout(function() {
 Essentially, `future.abort()` raises special abort exception on a current yield statement,
 so you can properly release all resources using finally blocks.
 
-###Tail calls
+### Tail calls
 
 ```javascript
 go(function* process() {
@@ -55,7 +55,7 @@ Note, that before `another_mode()` kicks in, the current generator
 will be properly completed.
 
 
-###Fast synchronous execution
+### Fast synchronous execution
 
 ```javascript
 go(function*() {
@@ -69,6 +69,6 @@ Sometimes async values are immediately available. Sometimes, there are a lot of 
 values immediately available. Common practice of wrapping such values in `Promise`
 leads to disaster. But within our go blocks `var a = yield 1` is nearly as fast `var a = 1`.
 
-##Installation
+## Installation
 
 Not yet released
