@@ -49,7 +49,7 @@ function* another_mode() {
 }
 ```
 
-Here we start processing events from some event source until
+Here we start to process events from some event source until
 ordered to switch to another processing mode.
 Note, that before `another_mode()` kicks in, the current generator
 will be properly completed.
