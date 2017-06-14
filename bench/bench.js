@@ -48,12 +48,12 @@ suite.add('Plain return', function() {
 })
 
 suite.add('Sync iterating 10 element array', function() {
-  var future = go(sum, array_10)
+  var future = go(function() {return sum(array_10)})
   assert.equal(future.value, 10)
 })
 
 suite.add('Sync iterating 100 element array', function() {
-  var future = go(sum, array_100)
+  var future = go(function() {return sum(array_100)})
   assert.equal(future.value, 100)
 })
 
@@ -77,6 +77,17 @@ suite.add('Plain 100 element array iteration via generator', function() {
   }
   assert.equal(sum, 100)
 })
+
+suite.add('Sync nested 100', function() {
+  var i = 100
+  var sum = 0
+  while(i--) {
+    sum += sync_one()
+  }
+  assert.equal(sum, 100)
+})
+
+function sync_one() { return 1 }
 
 suite.on('cycle', function(ev, bench) {
   console.log(String(ev.target))

@@ -2,11 +2,12 @@ var should = require('should')
 var go = require('../go')
 
 describe('go-async', function() {
-  describe('go block', function() {
+  describe('go-block', function() {
     it('Should return future', function() {
-      go(function*() {
+      var f = go(function*() {
         yield 1
-      }).should.be.instanceOf(go.Future)
+      })
+      f.should.be.instanceOf(go.Future)
     })
 
     it('Should support generators', function(done) {
@@ -74,21 +75,26 @@ describe('go-async', function() {
       finals.should.equal(0)
       f.abort()
       finals.should.equal(2)
-      f.aborted.should.be.true
     })
 
     it('Should support abortion within generator', function() {
-      var task = new go.Future
       var lock = new go.Future
+      var seenAbortException = false
       var f = go(function*() {
         yield lock
         should(function() {
           f.abort()
         }).not.throw()
-        yield task
+        try {
+          yield 1
+        } catch(e) {
+          e.should.have.property('go_abort_exception').equal(true)
+          seenAbortException = true
+          throw e
+        }
       })
       lock.done()
-      task.aborted.should.be.true
+      seenAbortException.should.be.true
     })
   })
 })
