@@ -31,12 +31,15 @@ Future.prototype.done = function(err, val) {
   this.ready = true
   this.error = err
   this.value = val
+  if (this.cbs) this.callCallbacks(err, val)
+}
+
+
+Future.prototype.callCallbacks = function(err, val) {
   var cbs = this.cbs
-  if (cbs) {
-    this.cbs = null
-    for (var i = 0; i < cbs.length; i++) {
-      safecall(cbs[i], err, val)
-    }
+  this.cbs = null
+  for (var i = 0; i < cbs.length; i++) {
+    safecall(cbs[i], err, val)
   }
 }
 
