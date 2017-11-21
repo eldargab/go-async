@@ -42,6 +42,19 @@ function* iterate(arr) {
   }
 }
 
+function* gen_nested() {
+  var i = 100
+  while(i--) {
+    for (j of yield_one()) {
+      yield j
+    }
+  }
+}
+
+function* yield_one() {
+  yield 1
+}
+
 suite.add('Plain return', function() {
   var future = go(one)
   assert.equal(future.value, 1)
@@ -78,11 +91,18 @@ suite.add('Plain 100 element array iteration via generator', function() {
   assert.equal(sum, 100)
 })
 
-suite.add('Sync nested 100', function() {
-  var i = 100
+suite.add('Plain 100 element array iteration via for loop', function() {
   var sum = 0
-  while(i--) {
-    sum += sync_one()
+  for (var i = 0; i < array_100.length; i++) {
+    sum += array_100[i]
+  }
+  assert.equal(sum, 100)
+})
+
+suite.add('Sync nested 100', function() {
+  var sum = 0
+  for(var x of gen_nested()) {
+    sum += x
   }
   assert.equal(sum, 100)
 })

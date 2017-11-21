@@ -1,14 +1,23 @@
 
-var exports = module.exports = function go(block) {
+exports = module.exports = go
+exports.Future = Future
+exports.thunk = thunk
+exports.patchPromise = patchPromise
+
+
+function go(block) {
   var future = new Future
-  var stack = new Stack
-  stack.push(block())
-  run(stack, future, null, null)
+  var gen = block()
+  run(gen, future)
   return future
 }
 
 
-exports.Future = Future
+go.run = function(asyncValue) {
+  var future = new Future
+  asyncValue.__yield_to_future(future)
+  return future
+}
 
 
 function Future() {
@@ -22,19 +31,23 @@ Future.prototype.done = function(err, val) {
   this.ready = true
   this.error = err
   this.value = val
-  if (this.cbs == null) return
-  for(var i = 0; i < this.cbs.length; i++) {
-    safecall(this.cbs[i], err, val)
+  var cbs = this.cbs
+  if (cbs) {
+    this.cbs = null
+    for (var i = 0; i < cbs.length; i++) {
+      safecall(cbs[i], err, val)
+    }
   }
-  this.cbs = null
 }
 
 
 Future.prototype.abort = function() {
   this.aborted = true
-  if (this.onabort == null) return
-  safecall(this.onabort)
-  this.onabort = null
+  var onabort = this.onabort
+  if (onabort) {
+    this.onabort = null
+    safecall(onabort)
+  }
 }
 
 
@@ -49,115 +62,76 @@ Future.prototype.get = function(cb) {
 }
 
 
-Future.prototype.__to_go_future = function() {
-  return this
-}
+Future.prototype.__yield_to_future = function(future) {
+  if (this.ready) return future.done(this.error, this.value)
+  if (this.aborted) return future.abort()
 
-
-Future.prototype.__is_go_async = true
-
-
-Future.prototype.toPromise = function() {
   var self = this
-  return new Promise(function(resolve, reject) {
-    self.get(function(err, val) {
-      if (err) {
-        reject(err)
-      } else {
-        resolve(val)
-      }
-    })
+
+  future.onabort = function() {
+    self.abort()
+  }
+
+  this.get(function(err, val) {
+    future.done(err, val)
   })
 }
 
 
-exports.upgradePromise = upgradePromise
-function upgradePromise(promise) {
-  Object.defineProperty(promise, '__to_go_future', {value: function() {
-    var f = new Future
-
+function patchPromise(promise) {
+  Object.defineProperty(promise, '__yield_to_future', {value: function(future) {
     this.then(function(val) {
-      f.done(null, val)
+      future.done(null, val)
     })
 
     this.catch(function(err) {
-      f.done(toError(err))
+      future.done(toError(err))
     })
-
-    return f
   }})
-
-  Object.defineProperty(promise, '__is_go_async', {value: true})
 }
 
 
-upgradePromise(Promise.prototype)
-
-
-function Stack() {
-  this.stack = [null, null, null, null, null, null]
-  this.idx = -1
-  this.gen = null
+if (Promise.prototype.__yield_to_future == null) {
+  patchPromise(Promise.prototype)
 }
 
 
-Stack.prototype.push = function(gen) {
-  if (this.gen != null) this.stack[++this.idx] = this.gen
-  this.gen = gen
-}
+function run(gen, future, err, val) {
+  var itm
 
-
-Stack.prototype.pop = function() {
-  if (this.idx < 0) {
-    this.gen = null
-  } else {
-    this.gen = this.stack[this.idx]
-    this.stack[this.idx] = null
-    this.idx -= 1
-  }
-}
-
-
-function run(stack, future, err, val) {
-  if (future.aborted) return
   while(true) {
-    if (stack.gen == null) {
-      future.done(err, val)
+
+    try {
+      itm = err ? gen.throw(err) : gen.next(val)
+    } catch(e) {
+      future.done(toError(e))
       return
     }
 
-    try {
-      var itm = err ? stack.gen.throw(err) : stack.gen.next(val)
-    } catch(e) {
-      err = toError(e)
-      val = null
-      stack.pop()
-      continue
-    }
+    err = null
+    val = itm.value
 
     if (itm.done) {
-      stack.pop()
+      if (val == null || !val.__yield_to_future) {
+        future.done(err, val)
+      } else {
+        val.__yield_to_future(future)
+      }
+      return
     }
 
     if (future.aborted) {
-      yieldAbort(stack)
+      yieldAbort(gen)
       return
     }
 
-    if (itm.value == null || !itm.value.__is_go_async) {
-      err = null
-      val = itm.value
+    if (val == null || !val.__yield_to_future) {
       continue
     }
 
-    if (itm.value.__is_gen) {
-      err = null
-      val = null
-      stack.push(itm.value)
-      continue
-    }
+    var wait = new Future()
 
-    var wait = itm.value.__to_go_future()
+    val.__yield_to_future(wait)
 
     if (wait.ready) {
       err = wait.error
@@ -165,22 +139,24 @@ function run(stack, future, err, val) {
       continue
     }
 
-    future.onabort = function() {
-      wait.abort()
-      yieldAbort(stack)
-    }
-
-    wait.get(function(err, val) {
-      future.onabort = null
-      run(stack, future, err, val)
-    })
+    handleAsync(gen, future, wait)
 
     return
   }
 }
 
 
-exports.newAbortException = newAbortException
+function handleAsync(gen, future, wait) {
+  future.onabort = function() {
+    wait.abort()
+    yieldAbort(gen)
+  }
+
+  wait.get(function(err, val) {
+    future.onabort = null
+    if (!future.aborted) run(gen, future, err, val)
+  })
+}
 
 
 function newAbortException() {
@@ -190,29 +166,31 @@ function newAbortException() {
 }
 
 
-function yieldAbort(stack) {
+function yieldAbort(gen) {
   var exception = newAbortException()
-  while(stack.gen) {
-    try {
-      stack.gen.throw(exception)
-      tick(function() {
-        throw new Error('go blocks should not catch abort exceptions')
-      })
-    } catch(e) {
-      if (e !== exception) tick(function() {
-        throw e
-      })
-    }
-    stack.pop()
+  try {
+    gen.throw(exception)
+    tick(function() {
+      throw new Error('go blocks should not catch abort exceptions')
+    })
+  } catch(e) {
+    if (e !== exception) tick(function() {
+      throw e
+    })
   }
 }
 
 
-var Gen = (function*() { yield 1})().__proto__.__proto__
+var GeneratorPrototype = Object.getPrototypeOf(
+  Object.getPrototypeOf(
+    (function*() { yield 1 })()
+  )
+)
 
-Object.defineProperty(Gen, '__is_gen', {value: true})
 
-Object.defineProperty(Gen, '__is_go_async', {value: true})
+Object.defineProperty(GeneratorPrototype, '__yield_to_future', {value: function(future) {
+  run(this, future)
+}})
 
 
 function safecall(cb, err, val) {
@@ -243,21 +221,12 @@ function toError(e) {
 }
 
 
-exports.thunk = function(fn) {
-  return new Thunk(fn)
-}
-
-
 function Thunk(fn) {
   this.fn = fn
 }
 
 
-Thunk.prototype.__is_go_async = true
-
-
-Thunk.prototype.__to_go_future = function() {
-  var future = new Future
+Thunk.prototype.__yield_to_future = function(future) {
   try {
     this.fn(function(err, val) {
       future.done(err, val)
@@ -269,5 +238,9 @@ Thunk.prototype.__to_go_future = function() {
       future.done(toError(e))
     }
   }
-  return future
+}
+
+
+function thunk(fn) {
+  return new Thunk(fn)
 }
