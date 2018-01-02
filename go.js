@@ -1,22 +1,27 @@
 
 exports = module.exports = go
+exports.run = run
 exports.Future = Future
 exports.thunk = thunk
 exports.patchPromise = patchPromise
 
 
 function go(block) {
-  var future = new Future
   var gen = block()
-  run(gen, future)
+  var future = new Future
+  rungen(gen, future)
   return future
 }
 
 
-go.run = function(asyncValue) {
-  var future = new Future
-  asyncValue.__yield_to_future(future)
-  return future
+function run(val) {
+  if (val == null || !val.__yield_to_go_future) {
+    var future = new Future
+    future.done(null, val)
+    return future
+  } else {
+    return val.__to_go_future()
+  }
 }
 
 
@@ -31,11 +36,11 @@ Future.prototype.done = function(err, val) {
   this.ready = true
   this.error = err
   this.value = val
-  if (this.cbs) this.callCallbacks(err, val)
+  if (this.cbs) this._callCallbacks(err, val)
 }
 
 
-Future.prototype.callCallbacks = function(err, val) {
+Future.prototype._callCallbacks = function(err, val) {
   var cbs = this.cbs
   this.cbs = null
   for (var i = 0; i < cbs.length; i++) {
@@ -65,7 +70,37 @@ Future.prototype.get = function(cb) {
 }
 
 
-Future.prototype.__yield_to_future = function(future) {
+Future.prototype.toPromise = function() {
+  if (this._promise) return this._promise
+  var self = this
+  return this._promise = new Promise(function(resolve, reject) {
+    self.get(function(err, val) {
+      if (err) {
+        reject(err)
+      } else {
+        resolve(val)
+      }
+    })
+  })
+}
+
+
+Future.prototype.then = function() {
+  return Promise.prototype.then.apply(this.toPromise(), arguments)
+}
+
+
+Future.prototype.catch = function() {
+  return Promise.prototype.catch.apply(this.toPromise(), arguments)
+}
+
+
+Future.prototype.finally = function() {
+  return Promise.prototype.finally.apply(this.toPromise(), arguments)
+}
+
+
+Future.prototype.__yield_to_go_future = function(future) {
   if (this.ready) return future.done(this.error, this.value)
   if (this.aborted) return future.abort()
 
@@ -81,8 +116,20 @@ Future.prototype.__yield_to_future = function(future) {
 }
 
 
+Future.prototype.__to_go_future = function() {
+  return this
+}
+
+
+function __to_go_future() {
+  var future = new Future
+  this.__yield_to_go_future(future)
+  return future
+}
+
+
 function patchPromise(promise) {
-  Object.defineProperty(promise, '__yield_to_future', {value: function(future) {
+  Object.defineProperty(promise, '__yield_to_go_future', {value: function(future) {
     this.then(function(val) {
       future.done(null, val)
     })
@@ -91,15 +138,32 @@ function patchPromise(promise) {
       future.done(toError(err))
     })
   }})
+
+  Object.defineProperty(promise, '__to_go_future', {value: __to_go_future})
 }
 
 
-if (Promise.prototype.__yield_to_future == null) {
+if (Promise.prototype.__yield_to_go_future == null) {
   patchPromise(Promise.prototype)
 }
 
 
-function run(gen, future, err, val) {
+var GeneratorPrototype = Object.getPrototypeOf(
+  Object.getPrototypeOf(
+    (function*() { yield 1 })()
+  )
+)
+
+
+Object.defineProperty(GeneratorPrototype, '__yield_to_go_future', {value: function(future) {
+  rungen(this, future)
+}})
+
+
+Object.defineProperty(GeneratorPrototype, '__to_go_future', {value: __to_go_future})
+
+
+function rungen(gen, future, err, val) {
   var itm
 
   while(true) {
@@ -115,10 +179,10 @@ function run(gen, future, err, val) {
     val = itm.value
 
     if (itm.done) {
-      if (val == null || !val.__yield_to_future) {
+      if (val == null || !val.__yield_to_go_future) {
         future.done(err, val)
       } else {
-        val.__yield_to_future(future)
+        val.__yield_to_go_future(future)
       }
       return
     }
@@ -128,13 +192,11 @@ function run(gen, future, err, val) {
       return
     }
 
-    if (val == null || !val.__yield_to_future) {
+    if (val == null || !val.__yield_to_go_future) {
       continue
     }
 
-    var wait = new Future()
-
-    val.__yield_to_future(wait)
+    var wait = val.__to_go_future()
 
     if (wait.ready) {
       err = wait.error
@@ -156,8 +218,9 @@ function handleAsync(gen, future, wait) {
   }
 
   wait.get(function(err, val) {
+    if (future.aborted) return
     future.onabort = null
-    if (!future.aborted) run(gen, future, err, val)
+    rungen(gen, future, err, val)
   })
 }
 
@@ -182,18 +245,6 @@ function yieldAbort(gen) {
     })
   }
 }
-
-
-var GeneratorPrototype = Object.getPrototypeOf(
-  Object.getPrototypeOf(
-    (function*() { yield 1 })()
-  )
-)
-
-
-Object.defineProperty(GeneratorPrototype, '__yield_to_future', {value: function(future) {
-  run(this, future)
-}})
 
 
 function safecall(cb, err, val) {
@@ -229,7 +280,7 @@ function Thunk(fn) {
 }
 
 
-Thunk.prototype.__yield_to_future = function(future) {
+Thunk.prototype.__yield_to_go_future = function(future) {
   try {
     this.fn(function(err, val) {
       future.done(err, val)
@@ -242,6 +293,9 @@ Thunk.prototype.__yield_to_future = function(future) {
     }
   }
 }
+
+
+Thunk.prototype.__to_go_future = __to_go_future
 
 
 function thunk(fn) {
