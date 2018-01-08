@@ -4,6 +4,7 @@ exports.run = run
 exports.Future = Future
 exports.thunk = thunk
 exports.patchPromise = patchPromise
+exports.toError = toError
 
 
 function go(block) {
@@ -61,7 +62,7 @@ Future.prototype.abort = function() {
 
 Future.prototype.get = function(cb) {
   if (this.ready) {
-    cb(this.error, this.value)
+    safecall(cb, this.error, this.value)
   } else if (this.cbs) {
     this.cbs.push(cb)
   } else {
@@ -101,9 +102,15 @@ Future.prototype.finally = function() {
 
 
 Future.prototype.__yield_to_go_future = function(future) {
-  if (this.ready) return future.done(this.error, this.value)
-  if (this.aborted) return future.abort()
+  if (this.ready) {
+    future.done(this.error, this.value)
+  } else {
+    this._yieldAsync(future)
+  }
+}
 
+
+Future.prototype._yieldAsync = function(future) {
   var self = this
 
   future.onabort = function() {
@@ -111,6 +118,7 @@ Future.prototype.__yield_to_go_future = function(future) {
   }
 
   this.get(function(err, val) {
+    future.onabort = null
     future.done(err, val)
   })
 }

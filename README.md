@@ -1,74 +1,101 @@
 # go-async
 
-Non-conformant, generator based async/await blocks
-with support for abortion, form of TCO and fast synchronous execution.
+This library appeared because neither standard `async/await` functions nor
+numerous polyfills have the following properties.
 
-## Highlights
+### Fast synchronous execution
+
+Sometimes potentially async values are more often immediately available than not.
+Typical examples of such cases are caching and lazy initialisation.
+Also for streaming parsers it's often the case that
+single network packet contains many syntactic constructs and hence polling
+for the next chunk more often succeeds than not.
+
+Standard control flow utilities wrap and defer synchronous values
+what leads to a very slow execution (100, 1000, 1000000+ times slower than analogous synchronous code).
+
+To the contrary, with `go-async` you can `yield` synchronous values directly without any overhead.
+
+At the time of writing `sumSync()` below is just 20 times faster than `sumAsync()`.
+
+```javascript
+function sumSync() {
+  var sum = 0
+  for(var i = 0; i < arr.length; i++) {
+    sum += arr[i]
+  }
+  return sum
+}
+
+function* sumAsync() {
+  var sum = 0
+  for(var i = 0; i < arr.length; i++) {
+    sum += yield arr[i]
+  }
+  return sum
+}
+```
 
 ### Abortion
 
+It should be possible to abort long running computations and release all resources.
+
 ```javascript
-var future = go(function*() {
-  var f = yield open('foo/bar')
+var go = require('go-async')
+
+var future = go(function* copy() {
   try {
-    var line
-    while (line = yield f.readLine()) {
-      console.log(line)
+    var src = yield open('foo/src')
+    var target = yield open('foo/target', 'w')
+    var chunk
+    while(null != (chunk = yield src.read())) {
+      yield target.write(chunk)
     }
   } finally {
-    f.close()
+    src && src.close()
+    target && target.close()
   }
 })
 
+// abort coping if it takes more than 10 secs
 setTimeout(function() {
   future.abort()
 }, 10000)
 ```
 
-Essentially, `future.abort()` raises special abort exception on a current yield statement,
-so you can properly release all resources using finally blocks.
+Abortion is done by raising a special abort exception (`e.go_abort_exception == true`)
+on a current yield statement.
 
 ### Tail calls
 
 ```javascript
 go(function* process() {
-  var events = subscribe()
+  var resource = open()
   try {
-    var event = yield events.receive()
-    while (event != 'switch_to_another_mode') {
-      handle(event)
-    }
-    return another_mode()
+    yield processResource(resource)
+    return anotherProcessingMode()
   } finally {
-    events.unsubscribe()
+    resource.close()
   }
+}).get(funcion(err, result) {
+  assert.equal(result, 1)
 })
 
-function* another_mode() {
-  //do something else
+function* anotherProcessingMode() {
+  // By the time execution reaches this line all of the `process()` resources will be freed.
+  return 1
 }
 ```
 
-Here we start to process events from some event source until
-ordered to switch to another processing mode.
-Note, that before `another_mode()` kicks in, the current generator
-will be properly completed.
+## Usage
 
+TODO
 
-### Fast synchronous execution
-
-```javascript
-go(function*() {
-  var a = yield 1
-  var b = yield 10
-  return a + b
-})
-```
-
-Sometimes async values are immediately available. Sometimes, there are a lot of async
-values immediately available. Common practice of wrapping such values in `Promise`
-leads to disaster. But within our go blocks `var a = yield 1` is nearly as fast `var a = 1`.
 
 ## Installation
 
-Not yet released
+Via npm
+
+```
+npm install go-async
+```

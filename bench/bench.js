@@ -75,6 +75,24 @@ suite.add('Nested 100', function() {
   assert.equal(future.value, 100)
 })
 
+suite.add('4 async values', function() {
+  let v1 = new go.Future
+  let v2 = new go.Future
+  let v3 = new go.Future
+  let v4 = new go.Future
+
+  var future = go(function*() {
+    return (yield v1) + (yield v2) + (yield v3) + (yield v4)
+  })
+
+  v1.done(null, 1)
+  v2.done(null, 1)
+  v3.done(null, 1)
+  v4.done(null, 1)
+
+  assert.equal(future.value, 4)
+})
+
 suite.add('Plain 10 element array iteration via generator', function() {
   var sum = 0
   for(var x of iterate(array_10)) {
@@ -99,7 +117,7 @@ suite.add('Plain 100 element array iteration via for loop', function() {
   assert.equal(sum, 100)
 })
 
-suite.add('Sync nested 100', function() {
+suite.add('Gen nested 100', function() {
   var sum = 0
   for(var x of gen_nested()) {
     sum += x
