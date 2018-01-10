@@ -38,8 +38,7 @@ suite.add('Plain 100 element array iteration via for loop', function() {
 })
 ```
 
-Async case is still ~ 20 times slower,
-but that's better than millions (and comparison is not completely fair).
+Async case is still ~ 10 times slower, but that's better than millions.
 
 ### Abortion
 
@@ -104,8 +103,8 @@ let future = go(function*() {
 
 // Query for result
 if (future.ready) {
-  assert.equal(future.value, 5) 
-  assert.equal(future.error, null)       
+  assert.equal(future.value, 5)
+  assert.equal(future.error, null)
 }
 
 // Get the result via node style callback. It might be called immediately.
@@ -129,10 +128,10 @@ it is somewhat faster than duck typing. The downside is that we ought to patch s
 Currently there are 4 types of async values
 
   * `Generator` (i.e all generators are treated as an async code blocks)
-  * `Promise` 
+  * `Promise`
   * `go.Thunk` (created by go.thunk(fn)) - async value which calls lazily given `fn` with a node style callback
   * `go.Future`
-  
+
 You can normalize all async values to `go.Future` with `go.run()`.
 
 ### Patching Promise.prototype

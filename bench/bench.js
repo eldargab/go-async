@@ -19,14 +19,6 @@ function* one() {
   return 1
 }
 
-function* sum(arr) {
-  var sum = 0
-  for(var i = 0; i < arr.length; i++) {
-    sum += yield arr[i]
-  }
-  return sum
-}
-
 function* nested() {
   var i = 100
   var ret = 0
@@ -60,13 +52,29 @@ suite.add('Plain return', function() {
   assert.equal(future.value, 1)
 })
 
+function* sum10(arr) {
+  var sum = 0
+  for(var i = 0; i < array_10.length; i++) {
+    sum += yield array_10[i]
+  }
+  return sum
+}
+
 suite.add('Sync iterating 10 element array', function() {
-  var future = go(function() {return sum(array_10)})
+  var future = go(sum10)
   assert.equal(future.value, 10)
 })
 
+function* sum100() {
+  var sum = 0
+  for (var i = 0; i < array_100.length; i++) {
+    sum += yield array_100[i]
+  }
+  return sum
+}
+
 suite.add('Sync iterating 100 element array', function() {
-  var future = go(function() {return sum(array_100)})
+  var future = go(sum100)
   assert.equal(future.value, 100)
 })
 
