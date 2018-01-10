@@ -131,4 +131,4 @@ suite.on('cycle', function(ev, bench) {
   console.log(String(ev.target))
 })
 
-suite.run({async: true})
+suite.run()
