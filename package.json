@@ -14,9 +14,9 @@
   },
   "main": "./go.js",
   "devDependencies": {
-    "benchmark": "^1.0.0",
-    "mocha": "^3.4.2",
-    "should": "^6.0.3"
+    "benchmark": "^2.1.4",
+    "mocha": "^4.1.0",
+    "should": "^13.2.0"
   },
   "license": "MIT",
   "scripts": {
