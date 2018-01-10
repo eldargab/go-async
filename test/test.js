@@ -49,13 +49,13 @@ describe('go-async', function() {
         var b = yield go(function*() { return 10 })
         return a + b
       })
-      f.ready.should.be.true
+      f.ready.should.be.true()
       f.value.should.equal(11)
     })
 
     it('Should support abortion', function() {
       var finals = 0
-      var catched = false
+      var caught = false
       var f = go(function*() {
         try {
           yield go(function*() {
@@ -66,14 +66,16 @@ describe('go-async', function() {
             }
           })
         } catch(e) {
-          catched = true
+          caught = true
+          e.go_abort_exception.should.be.true()
+          throw e
         } finally {
           finals++
         }
       })
-      catched.should.be.false
       finals.should.equal(0)
       f.abort()
+      caught.should.be.true()
       finals.should.equal(2)
     })
 
@@ -94,7 +96,7 @@ describe('go-async', function() {
         }
       })
       lock.done()
-      seenAbortException.should.be.true
+      seenAbortException.should.be.true()
     })
   })
 })
