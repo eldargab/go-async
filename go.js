@@ -7,6 +7,12 @@ exports.patchPromise = patchPromise
 exports.toError = toError
 
 
+/**
+ * Execute async code block.
+ *
+ * @param {function(): Generator} block
+ * @returns {Future}
+ */
 function go(block) {
   var gen = block()
   var future = new Future
@@ -15,6 +21,12 @@ function go(block) {
 }
 
 
+/**
+ * Convert any value to {Future}.
+ *
+ * @param val
+ * @returns {Future}
+ */
 function run(val) {
   if (val == null || !val.__yield_to_go_future) {
     var future = new Future
@@ -26,12 +38,32 @@ function run(val) {
 }
 
 
+/**
+ * Creates a new Future.
+ *
+ * @constructor
+ * @classdesc Analog of Promise, but with support for synchronous completion and abortion
+ */
 function Future() {
   this.ready = false
   this.aborted = false
 }
 
 
+/**
+ * Set the result of computation.
+ *
+ * This is a one time operation. Subsequent calls to `.done()` have no effect.
+ *
+ * Examples:
+ *
+ *    future.done(null, 1)              // Successfully complete with value 1
+ *    future.done(new Error('Unknown')) // Complete with error
+ *
+ * @param {Error?} err
+ * @param [val]
+ * @public
+ */
 Future.prototype.done = function(err, val) {
   if (this.ready) return
   this.ready = true
@@ -50,6 +82,12 @@ Future.prototype._callCallbacks = function(err, val) {
 }
 
 
+/**
+ * Signal to async computation that the result is no longer needed.
+ *
+ * Note that abortion and future readiness are completely unrelated.
+ * To provide some result call `.done()` separately.
+ */
 Future.prototype.abort = function() {
   this.aborted = true
   var onabort = this.onabort
@@ -60,6 +98,13 @@ Future.prototype.abort = function() {
 }
 
 
+/**
+ * Get the result via node style callback.
+ *
+ * Note that callback might be called immediately.
+ *
+ * @param cb - Node style callback
+ */
 Future.prototype.get = function(cb) {
   if (this.ready) {
     safecall(cb, this.error, this.value)
@@ -71,6 +116,11 @@ Future.prototype.get = function(cb) {
 }
 
 
+/**
+ * Convert this future to a standard `Promise`.
+ *
+ * @returns {Promise}
+ */
 Future.prototype.toPromise = function() {
   if (this._promise) return this._promise
   var self = this
@@ -86,16 +136,31 @@ Future.prototype.toPromise = function() {
 }
 
 
+/**
+ * Like {Promise#then}
+ *
+ * @returns {Promise}
+ */
 Future.prototype.then = function() {
   return Promise.prototype.then.apply(this.toPromise(), arguments)
 }
 
 
+/**
+ * Like {Promise#catch}
+ *
+ * @returns {Promise}
+ */
 Future.prototype.catch = function() {
   return Promise.prototype.catch.apply(this.toPromise(), arguments)
 }
 
 
+/**
+ * Like {Promise#finally}
+ *
+ * @returns {Promise}
+ */
 Future.prototype.finally = function() {
   return Promise.prototype.finally.apply(this.toPromise(), arguments)
 }
@@ -136,6 +201,11 @@ function __to_go_future() {
 }
 
 
+/**
+ * Patch the standard `promise` to become compatible with `go-async`'s async value protocol
+ *
+ * @param promise
+ */
 function patchPromise(promise) {
   Object.defineProperty(promise, '__yield_to_go_future', {value: function(future) {
     this.then(function(val) {
@@ -275,6 +345,12 @@ function tick(cb) {
 }
 
 
+/**
+ * If the given value is an instance of {Error} just return it as is, else wrap it with one
+ *
+ * @param e
+ * @returns {Error}
+ */
 function toError(e) {
   if (e instanceof Error) return e
   var err = new Error('Non-error object was throwed')
@@ -306,6 +382,21 @@ Thunk.prototype.__yield_to_go_future = function(future) {
 Thunk.prototype.__to_go_future = __to_go_future
 
 
+/**
+ * Create a thunk.
+ *
+ * Thunk is an async value which calls lazily given `fn` with a node style callback
+ *
+ * Example:
+ *
+ *    go(function*() {
+ *      var one = yield thunk(cb => cb(null, 1))
+ *      assert.equal(one, 1)
+ *    })
+ *
+ * @param fn
+ * @returns {Thunk}
+ */
 function thunk(fn) {
   return new Thunk(fn)
 }

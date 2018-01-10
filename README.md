@@ -1,48 +1,52 @@
 # go-async
 
-This library appeared because neither standard `async/await` functions nor
-numerous polyfills have the following properties.
+Generator based `async/await` code blocks with support for abortion, form of TCO
+and fast synchronous execution.
 
 ### Fast synchronous execution
 
 Sometimes potentially async values are more often immediately available than not.
 Typical examples of such cases are caching and lazy initialisation.
-Also for streaming parsers it's often the case that
-single network packet contains many syntactic constructs and hence polling
-for the next chunk more often succeeds than not.
 
 Standard control flow utilities wrap and defer synchronous values
-what leads to a very slow execution (100, 1000, 1000000+ times slower than analogous synchronous code).
+what leads to a very pure performance (100, 1000, 1000000+ times slower than analogous synchronous code).
 
-To the contrary, with `go-async` you can `yield` synchronous values directly without any overhead.
+To the contrary, `go-async`'s `yield` statement can accept synchronous values directly.
+In addition the `Future` object is provided which is analogous to `Promise`,
+but can be completed and queried synchronously.
 
-At the time of writing `sumSync()` below is just 20 times faster than `sumAsync()`.
+The overall result can be summarised with benchmark below.
 
 ```javascript
-function sumSync() {
-  var sum = 0
-  for(var i = 0; i < arr.length; i++) {
-    sum += arr[i]
-  }
-  return sum
-}
+suite.add('100 element array iteration', function() {
+  var future = go(function*() {
+    var sum = 0
+    for (var i = 0; i < array_100.length; i++) {
+      sum += yield array_100[i]
+    }
+    return sum
+  })
+  assert.equal(future.value, 100)
+})
 
-function* sumAsync() {
+suite.add('Plain 100 element array iteration via for loop', function() {
   var sum = 0
-  for(var i = 0; i < arr.length; i++) {
-    sum += yield arr[i]
+  for (var i = 0; i < array_100.length; i++) {
+    sum += array_100[i]
   }
-  return sum
-}
+  assert.equal(sum, 100)
+})
 ```
+
+Async case is still ~ 20 times slower,
+but that's better than millions (and comparison is not completely fair).
 
 ### Abortion
 
-It should be possible to abort long running computations and release all resources.
+Async computations can be aborted. This is done by raising
+a special abort exception (`e.go_abort_exception == true`) on a current yield statement.
 
 ```javascript
-var go = require('go-async')
-
 var future = go(function* copy() {
   try {
     var src = yield open('foo/src')
@@ -63,9 +67,6 @@ setTimeout(function() {
 }, 10000)
 ```
 
-Abortion is done by raising a special abort exception (`e.go_abort_exception == true`)
-on a current yield statement.
-
 ### Tail calls
 
 ```javascript
@@ -82,7 +83,7 @@ go(function* process() {
 })
 
 function* anotherProcessingMode() {
-  // By the time execution reaches this line all of the `process()` resources will be freed.
+  // By the time execution reaches this line `resource.close()` will be called.
   return 1
 }
 ```
@@ -90,7 +91,6 @@ function* anotherProcessingMode() {
 ## Usage
 
 TODO
-
 
 ## Installation
 
