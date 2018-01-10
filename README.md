@@ -78,7 +78,7 @@ go(function* process() {
   } finally {
     resource.close()
   }
-}).get(funcion(err, result) {
+}).get(function(err, result) {
   assert.equal(result, 1)
 })
 
@@ -90,7 +90,54 @@ function* anotherProcessingMode() {
 
 ## Usage
 
-TODO
+```javascript
+const go = require('go-async')
+
+let future = go(function*() {
+  let v1 = yield Promise.resolve(1) // wait for promise
+  let v2 = yield (function*() { return 1 })() // wait for another async code block (i.e. generator)
+  let v3 = yield go.thunk(cb => cb(null, 1)) // wait for thunk
+  let v4 = yield go.run(1) // wait for go.Future
+  let v5 = yield 1 // immediately proceed with the given value
+  return v1 + v2 + v3 + v4 + v5
+})
+
+// Query for result
+if (future.ready) {
+  assert.equal(future.value, 5) 
+  assert.equal(future.error, null)       
+}
+
+// Get the result via node style callback. It might be called immediately.
+future.get(function(err, val) {
+  assert.equal(err, null)
+  assert.equal(val, 5)
+})
+
+// Convert to Promise
+assert(future.toPromise() instanceof Promise)
+
+// Use Promise methods directly on future
+future.then(val => console.log(val))
+```
+
+### Async value protocol
+
+`go-async` recognises async values by the presence of special protocol methods. We went with this approach because
+it is somewhat faster than duck typing. The downside is that we ought to patch some standard prototypes.
+
+Currently there are 4 types of async values
+
+  * `Generator` (i.e all generators are treated as an async code blocks)
+  * `Promise` 
+  * `go.Thunk` (created by go.thunk(fn)) - async value which calls lazily given `fn` with a node style callback
+  * `go.Future`
+  
+You can normalize all async values to `go.Future` with `go.run()`.
+
+### Patching Promise.prototype
+
+If you use non-standard Promise implementation, make sure you patched it's prototype with `go.patchPromise()`.
 
 ## Installation
 
@@ -99,3 +146,7 @@ Via npm
 ```
 npm install go-async
 ```
+
+## License
+
+MIT
