@@ -18,7 +18,7 @@ but can be completed and queried synchronously.
 The overall result can be summarised with benchmark below.
 
 ```javascript
-suite.add('100 element array iteration', function() {
+suite.add('Sync iterating 100 element array', function() {
   var future = go(function*() {
     var sum = 0
     for (var i = 0; i < array_100.length; i++) {
@@ -27,7 +27,7 @@ suite.add('100 element array iteration', function() {
     return sum
   })
   assert.equal(future.value, 100)
-})
+}) // x 283,427 ops/sec ±2.06% (83 runs sampled)
 
 suite.add('Plain 100 element array iteration via for loop', function() {
   var sum = 0
@@ -35,10 +35,10 @@ suite.add('Plain 100 element array iteration via for loop', function() {
     sum += array_100[i]
   }
   assert.equal(sum, 100)
-})
+}) // x 6,753,023 ops/sec ±1.11% (91 runs sampled)
 ```
 
-Async case is still ~ 10 times slower, but that's better than millions.
+As we can async case is still ~ 30 times slower, but that better than millions.
 
 ### Abortion
 
@@ -125,14 +125,13 @@ future.then(val => console.log(val))
 `go-async` recognises async values by the presence of special protocol methods. We went with this approach because
 it is somewhat faster than duck typing. The downside is that we ought to patch some standard prototypes.
 
-Currently there are 4 types of async values
+Currently there are 3 types of async values
 
   * `Generator` (i.e all generators are treated as an async code blocks)
   * `Promise`
-  * `go.Thunk` (created by go.thunk(fn)) - async value which calls lazily given `fn` with a node style callback
   * `go.Future`
 
-You can normalize all async values to `go.Future` with `go.run()`.
+You can normalize all values (sync and async) to `go.Future` with `go.run()`.
 
 ### Patching Promise.prototype
 
