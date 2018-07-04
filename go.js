@@ -39,7 +39,7 @@ function run(val) {
 
 
 /**
- * Creates a new Future.
+ * Create a new Future.
  *
  * @constructor
  * @classdesc Analog of Promise, but with support for synchronous completion and abortion
@@ -359,38 +359,14 @@ function toError(e) {
 }
 
 
-function Thunk(fn) {
-  this.fn = fn
-}
-
-
-Thunk.prototype.__yield_to_go_future = function(future) {
-  try {
-    this.fn(function(err, val) {
-      future.done(err, val)
-    })
-  } catch(e) {
-    if (future.ready) {
-      tick(function() { throw e })
-    } else {
-      future.done(toError(e))
-    }
-  }
-}
-
-
-Thunk.prototype.__to_go_future = __to_go_future
-
 
 /**
- * Create a thunk.
- *
- * Thunk is an async value which calls lazily given `fn` with a node style callback
+ * Call given function with a node style callback and return a {Future}
  *
  * Example:
  *
  *    go(function*() {
- *      var one = yield thunk(cb => cb(null, 1))
+ *      let one = yield thunk(cb => cb(null, 1))
  *      assert.equal(one, 1)
  *    })
  *
@@ -398,5 +374,9 @@ Thunk.prototype.__to_go_future = __to_go_future
  * @returns {Thunk}
  */
 function thunk(fn) {
-  return new Thunk(fn)
+  var future = new Future
+  fn(function(err, result) {
+    future.done(err, result)
+  })
+  return future
 }
