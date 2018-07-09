@@ -233,12 +233,14 @@ var GeneratorPrototype = Object.getPrototypeOf(
 )
 
 
-Object.defineProperty(GeneratorPrototype, '__yield_to_go_future', {value: function(future) {
-  rungen(this, future)
-}})
+if (GeneratorPrototype.__yield_to_go_future == null) {
+  Object.defineProperty(GeneratorPrototype, '__yield_to_go_future', {value: function(future) {
+      rungen(this, future)
+    }})
 
 
-Object.defineProperty(GeneratorPrototype, '__to_go_future', {value: __to_go_future})
+  Object.defineProperty(GeneratorPrototype, '__to_go_future', {value: __to_go_future})
+}
 
 
 function rungen(gen, future, err, val) {
