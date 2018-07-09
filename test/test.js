@@ -2,7 +2,7 @@ var should = require('should')
 var go = require('../go')
 
 describe('go-async', function() {
-  describe('go-block', function() {
+  describe('go()', function() {
     it('Should return future', function() {
       var f = go(function*() {
         yield 1
@@ -97,6 +97,70 @@ describe('go-async', function() {
       })
       lock.done()
       seenAbortException.should.be.true()
+    })
+
+    describe('Should safely call any function with given arguments', function() {
+      let error = new Error
+
+      it('0 arguments', function(done) {
+        go(function() {
+          arguments.length.should.equal(0)
+          throw error
+        }).get(function(err) {
+          err.should.be.exactly(error)
+          done()
+        })
+      })
+
+      it('1 arguments', function(done) {
+        go(function(a) {
+          arguments.length.should.equal(1)
+          a.should.equal(1)
+          throw error
+        }, 1).get(function(err) {
+          err.should.be.exactly(error)
+          done()
+        })
+      })
+
+      it('2 arguments', function(done) {
+        go(function(a, b) {
+          arguments.length.should.equal(2)
+          a.should.equal(1)
+          b.should.equal(2)
+          throw error
+        }, 1, 2).get(function(err) {
+          err.should.be.exactly(error)
+          done()
+        })
+      })
+
+      it('3 arguments', function(done) {
+        go(function(a, b, c) {
+          arguments.length.should.equal(3)
+          a.should.equal(1)
+          b.should.equal(2)
+          c.should.equal(3)
+          throw error
+        }, 1, 2, 3).get(function(err) {
+          err.should.be.exactly(error)
+          done()
+        })
+      })
+
+      it('4 arguments', function(done) {
+        go(function(a, b, c, d) {
+          arguments.length.should.equal(4)
+          a.should.equal(1)
+          b.should.equal(2)
+          c.should.equal(3)
+          d.should.equal(4)
+          throw error
+        }, 1, 2, 3, 4).get(function(err) {
+          err.should.be.exactly(error)
+          done()
+        })
+      })
     })
   })
 })

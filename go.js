@@ -8,15 +8,41 @@ exports.toError = toError
 
 
 /**
- * Execute async code block.
+ * Safely execute any function and convert the result to Future
  *
- * @param {function(): Generator} block
+ * @param {function} block
+ * @param {...*} block_arguments
  * @returns {Future}
  */
 function go(block) {
-  var gen = block()
+  var val
+  try {
+    switch (arguments.length) {
+      case 1:
+        val = block()
+        break
+      case 2:
+        val = block(arguments[1])
+        break
+      case 3:
+        val = block(arguments[1], arguments[2])
+        break
+      case 4:
+        val = block(arguments[1], arguments[2], arguments[3])
+        break
+      default:
+        val = block.apply(null, Array.prototype.slice.call(arguments, 1))
+    }
+  } catch (e) {
+    return finished(toError(e))
+  }
+  return run(val)
+}
+
+
+function finished(err, val) {
   var future = new Future
-  rungen(gen, future)
+  future.done(err, val)
   return future
 }
 
@@ -29,9 +55,7 @@ function go(block) {
  */
 function run(val) {
   if (val == null || !val.__yield_to_go_future) {
-    var future = new Future
-    future.done(null, val)
-    return future
+    return finished(null, val)
   } else {
     return val.__to_go_future()
   }
