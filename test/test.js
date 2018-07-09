@@ -104,10 +104,10 @@ describe('go-async', function() {
 
       it('0 arguments', function(done) {
         go(function() {
-          arguments.length.should.equal(0)
-          throw error
-        }).get(function(err) {
-          err.should.be.exactly(error)
+          return arguments.length + 50
+        }).get(function(err, len) {
+          if (err) return done(err)
+          len.should.equal(50)
           done()
         })
       })
