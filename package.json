@@ -13,6 +13,7 @@
     "url": "https://eldargab@github.com/eldargab/go-async.git"
   },
   "main": "./go.js",
+  "types": "./go.d.ts",
   "devDependencies": {
     "benchmark": "^2.1.4",
     "mocha": "^5.2.0",
